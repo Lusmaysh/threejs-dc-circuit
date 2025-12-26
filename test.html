@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simulasi Sirkuit Listrik 3D</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap");
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: "Poppins", sans-serif;
+        background-color: #050510; /* Dark space vibe */
+        color: white;
+      }
+
+      #canvas-container {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+      }
+
+      /* UI Overlay - Glassmorphism Style */
+      #ui-panel {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        width: 320px;
+        background: rgba(20, 20, 35, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 25px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        transition: transform 0.3s ease;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+        margin: 0 0 10px 0;
+        background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 600;
+      }
+
+      p {
+        font-size: 0.9rem;
+        color: #b0b0d0;
+        line-height: 1.5;
+        margin-bottom: 20px;
+      }
+
+      /* Controls */
+      .control-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        font-size: 0.85rem;
+        margin-bottom: 8px;
+        color: #fff;
+        font-weight: 500;
+      }
+
+      /* Custom Range Slider */
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        background: transparent;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 16px;
+        width: 16px;
+        border-radius: 50%;
+        background: #00d2ff;
+        cursor: pointer;
+        margin-top: -6px;
+        box-shadow: 0 0 10px #00d2ff;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 4px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+      }
+
+      /* Buttons */
+      .btn-toggle {
+        width: 100%;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+        border-radius: 10px;
+        cursor: pointer;
+        font-family: inherit;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .btn-toggle:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .btn-toggle.active {
+        background: rgba(0, 210, 255, 0.15);
+        border-color: #00d2ff;
+        color: #00d2ff;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #ff4444;
+        box-shadow: 0 0 8px #ff4444;
+        transition: all 0.3s;
+      }
+      .active .status-dot {
+        background-color: #00ff88;
+        box-shadow: 0 0 8px #00ff88;
+      }
+
+      /* Info Tags */
+      .info-tag {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+        color: #aaa;
+        margin-top: 5px;
+        display: inline-block;
+      }
+
+      #loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #00d2ff;
+        font-size: 1.2rem;
+        letter-spacing: 2px;
+      }
+
+      /* Educational Tooltip area */
+      #edu-box {
+        margin-top: 15px;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.2);
+        border-left: 3px solid #ffd700;
+        border-radius: 0 8px 8px 0;
+      }
+      #edu-text {
+        font-size: 0.85rem;
+        color: #e0e0e0;
+      }
+      .highlight {
+        color: #ffd700;
+        font-weight: bold;
+      }
+    </style>
+
+    <!-- Import Maps Polyfill -->
+    <script
+      async
+      src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"
+    ></script>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="loading">MEMUAT SIMULASI...</div>
+
+    <div id="ui-panel">
+      <h1>Sirkuit Listrik DC</h1>
+      <p>Simulasi interaktif aliran arus listrik dan pergerakan elektron.</p>
+
+      <!-- Switch Control -->
+      <button id="btn-switch" class="btn-toggle" onclick="toggleSwitch()">
+        <span>Saklar Utama</span>
+        <div class="status-dot" id="switch-dot"></div>
+      </button>
+
+      <!-- Flow Direction Control -->
+      <div class="control-group">
+        <label>Mode Visualisasi:</label>
+        <button
+          id="btn-flow"
+          class="btn-toggle active"
+          onclick="toggleFlowMode()"
+        >
+          <span id="flow-label">Arus Konvensional (+ ke -)</span>
+        </button>
+        <div class="info-tag">Klik untuk ubah ke Aliran Elektron</div>
+      </div>
+
+      <!-- Voltage Control -->
+      <div class="control-group">
+        <label for="voltage-slider"
+          >Tegangan (Voltage): <span id="voltage-val">3.0</span> V</label
+        >
+        <input
+          type="range"
+          id="voltage-slider"
+          min="0"
+          max="12"
+          step="0.5"
+          value="3.0"
+        />
+      </div>
+
+      <!-- Resistance Info (Static for simplicity) -->
+      <div class="control-group">
+        <label style="color: #aaa"
+          >Hambatan (Resistance): <span>10 Ω</span></label
+        >
+      </div>
+
+      <!-- Educational Context -->
+      <div id="edu-box">
+        <div id="edu-text">
+          <span class="highlight">Sirkuit Terbuka.</span> Tidak ada arus yang
+          mengalir karena jalur terputus. Klik Saklar untuk menghubungkan.
+        </div>
+      </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+      import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+      import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
+      // --- KONFIGURASI GLOBAL ---
+      const CONFIG = {
+        wireColor: 0x222222,
+        electronColor: 0x00d2ff, // Biru Sci-fi
+        conventionalColor: 0xffaa00, // Emas/Kuning
+        bulbOffColor: 0x333333,
+        bulbOnColor: 0xffffee,
+        bloomStrength: 2.5, // Efek glowing
+        particleCount: 25, // DKURANGI (60 -> 25) agar lebih enak dilihat dan terpisah
+      };
+
+      // --- STATE AWAL ---
+      let state = {
+        isClosed: true, // Default ON
+        voltage: 3.0,
+        resistance: 10,
+        current: 0,
+        flowMode: "electron", // Default ke Aliran Elektron
+        speedMultiplier: 0,
+      };
+
+      // --- SIMPLE TWEEN LIBRARY ---
+      const TWEEN = {
+        tweens: [],
+        getAll: function () {
+          return this.tweens;
+        },
+        removeAll: function () {
+          this.tweens = [];
+        },
+        add: function (tween) {
+          this.tweens.push(tween);
+        },
+        remove: function (tween) {
+          const i = this.tweens.indexOf(tween);
+          if (i !== -1) this.tweens.splice(i, 1);
+        },
+        update: function (time) {
+          if (this.tweens.length === 0) return false;
+          let i = 0;
+          time = time !== undefined ? time : performance.now();
+          while (i < this.tweens.length) {
+            if (this.tweens[i].update(time)) i++;
+            else this.tweens.splice(i, 1);
+          }
+          return true;
+        },
+        Easing: {
+          Quadratic: {
+            Out: function (k) {
+              return k * (2 - k);
+            },
+            InOut: function (k) {
+              if ((k *= 2) < 1) return 0.5 * k * k;
+              return -0.5 * (--k * (k - 2) - 1);
+            },
+          },
+          Elastic: {
+            Out: function (k) {
+              if (k === 0) return 0;
+              if (k === 1) return 1;
+              return (
+                Math.pow(2, -10 * k) * Math.sin((k - 0.1) * 5 * Math.PI) + 1
+              );
+            },
+          },
+        },
+      };
+
+      TWEEN.Tween = function (object) {
+        this._object = object;
+        this._valuesStart = {};
+        this._valuesEnd = {};
+        this._duration = 1000;
+        this._easingFunction = TWEEN.Easing.Quadratic.Out;
+        this._startTime = null;
+      };
+
+      TWEEN.Tween.prototype = {
+        to: function (properties, duration) {
+          this._valuesEnd = properties;
+          if (duration !== undefined) this._duration = duration;
+          return this;
+        },
+        start: function (time) {
+          TWEEN.add(this);
+          this._startTime = time !== undefined ? time : performance.now();
+          for (const property in this._valuesEnd) {
+            this._valuesStart[property] = this._object[property];
+          }
+          return this;
+        },
+        easing: function (easing) {
+          this._easingFunction = easing;
+          return this;
+        },
+        update: function (time) {
+          let elapsed = (time - this._startTime) / this._duration;
+          elapsed = elapsed > 1 ? 1 : elapsed;
+          const value = this._easingFunction(elapsed);
+          for (const property in this._valuesEnd) {
+            const start = this._valuesStart[property];
+            const end = this._valuesEnd[property];
+            this._object[property] = start + (end - start) * value;
+          }
+          if (elapsed === 1) return false;
+          return true;
+        },
+      };
+
+      // --- VARIABEL THREE.JS ---
+      let scene, camera, renderer, composer, controls;
+      let particlesMesh, circuitPath;
+      let bulbMaterial, bulbLight, filamentMesh;
+      let switchLeverGroup;
+      let clock = new THREE.Clock();
+
+      // Data partikel untuk animasi
+      const dummy = new THREE.Object3D();
+      let particleProgress = []; // Menyimpan posisi 0-1 tiap partikel sepanjang jalur
+
+      init();
+      animate();
+
+      function init() {
+        // 1. Setup Scene
+        const container = document.getElementById("canvas-container");
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050510, 0.02);
+
+        // Camera Setup (Top-down angled view)
+        camera = new THREE.PerspectiveCamera(
+          45,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000
+        );
+        camera.position.set(0, 40, 40);
+        camera.lookAt(0, 0, 0);
+
+        // Renderer Setup
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        container.appendChild(renderer.domElement);
+
+        // 2. Post Processing (Bloom Effect)
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(
+          new THREE.Vector2(window.innerWidth, window.innerHeight),
+          1.5,
+          0.4,
+          0.85
+        );
+        bloomPass.threshold = 0;
+        bloomPass.strength = CONFIG.bloomStrength;
+        bloomPass.radius = 0.5;
+
+        composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // Controls
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2;
+
+        // 3. Pencahayaan
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        // 4. Buat Objek-Objek
+        createTableBase();
+        createCircuitPath();
+        createBattery();
+        createBulb();
+        createSwitch();
+        createParticles();
+
+        // UI Synchronization Initial State
+        const btnSwitch = document.getElementById("btn-switch");
+        const dotSwitch = document.getElementById("switch-dot");
+        if (state.isClosed) {
+          btnSwitch.classList.add("active");
+          dotSwitch.style.backgroundColor = "#00ff88";
+          dotSwitch.style.boxShadow = "0 0 8px #00ff88";
+        }
+
+        // Update flow mode button visual
+        const btnFlow = document.getElementById("btn-flow");
+        const labelFlow = document.getElementById("flow-label");
+        if (state.flowMode === "electron") {
+          btnFlow.classList.remove("active");
+          btnFlow.style.borderColor = CONFIG.electronColor;
+          btnFlow.style.color = "#00d2ff";
+          labelFlow.innerText = "Aliran Elektron (- ke +)";
+        }
+
+        updateEduText(state.isClosed);
+        updateSimulationState();
+
+        // Event Listeners
+        window.addEventListener("resize", onWindowResize);
+        document
+          .getElementById("voltage-slider")
+          .addEventListener("input", updateSimulationState);
+
+        document.getElementById("loading").style.display = "none";
+      }
+
+      function createTableBase() {
+        const gridHelper = new THREE.GridHelper(100, 50, 0x333333, 0x111111);
+        scene.add(gridHelper);
+
+        const planeGeo = new THREE.PlaneGeometry(100, 100);
+        const planeMat = new THREE.MeshBasicMaterial({ color: 0x050510 });
+        const plane = new THREE.Mesh(planeGeo, planeMat);
+        plane.rotation.x = -Math.PI / 2;
+        plane.position.y = -0.1;
+        scene.add(plane);
+      }
+
+      function createCircuitPath() {
+        const points = [];
+        const width = 15;
+        const depth = 10;
+
+        points.push(new THREE.Vector3(-width, 0, depth));
+        points.push(new THREE.Vector3(-width, 0, -depth));
+        points.push(new THREE.Vector3(width, 0, -depth));
+        points.push(new THREE.Vector3(width, 0, depth));
+
+        circuitPath = new THREE.CatmullRomCurve3(
+          points,
+          true,
+          "catmullrom",
+          0.1
+        );
+
+        const tubeGeo = new THREE.TubeGeometry(circuitPath, 100, 0.3, 8, true);
+        const tubeMat = new THREE.MeshStandardMaterial({
+          color: CONFIG.wireColor,
+          roughness: 0.4,
+          metalness: 0.8,
+        });
+        const wireMesh = new THREE.Mesh(tubeGeo, tubeMat);
+        scene.add(wireMesh);
+      }
+
+      function createBattery() {
+        const group = new THREE.Group();
+
+        const geometry = new THREE.CylinderGeometry(2, 2, 6, 32);
+        geometry.rotateZ(Math.PI / 2);
+        const material = new THREE.MeshStandardMaterial({
+          color: 0x111111,
+          metalness: 0.8,
+          roughness: 0.2,
+        });
+        const body = new THREE.Mesh(geometry, material);
+
+        const posGeo = new THREE.CylinderGeometry(2.1, 2.1, 1, 32);
+        posGeo.rotateZ(Math.PI / 2);
+        const posMat = new THREE.MeshStandardMaterial({
+          color: 0xffd700,
+          emissive: 0xaa6600,
+          emissiveIntensity: 0.2,
+        });
+        const posCap = new THREE.Mesh(posGeo, posMat);
+        posCap.position.x = 2.5;
+
+        const terminalPos = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.5, 0.5, 1, 16).rotateZ(Math.PI / 2),
+          new THREE.MeshStandardMaterial({ color: 0x888888 })
+        );
+        terminalPos.position.x = 3.5;
+
+        const negGeo = new THREE.CylinderGeometry(2.1, 2.1, 0.5, 32);
+        negGeo.rotateZ(Math.PI / 2);
+        const negMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+        const negCap = new THREE.Mesh(negGeo, negMat);
+        negCap.position.x = -2.75;
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = 128;
+        canvas.height = 64;
+        ctx.fillStyle = "#FFD700";
+        ctx.font = "bold 48px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("DC", 64, 50);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        const labelGeo = new THREE.PlaneGeometry(3, 1.5);
+        const labelMat = new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+        });
+        const label = new THREE.Mesh(labelGeo, labelMat);
+        label.position.set(0, 2.2, 0);
+        label.rotation.x = -Math.PI / 4;
+
+        group.add(body, posCap, negCap, terminalPos, label);
+
+        group.position.set(0, 1, 10);
+        scene.add(group);
+      }
+
+      function createBulb() {
+        const group = new THREE.Group();
+
+        const socketGeo = new THREE.CylinderGeometry(1.5, 1.5, 2, 32);
+        const socketMat = new THREE.MeshStandardMaterial({
+          color: 0x444444,
+          metalness: 0.8,
+        });
+        const socket = new THREE.Mesh(socketGeo, socketMat);
+        socket.position.y = 1;
+
+        const bulbGeo = new THREE.SphereGeometry(2.5, 32, 32);
+        bulbMaterial = new THREE.MeshPhysicalMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.3,
+          transmission: 0.95,
+          roughness: 0.1,
+          metalness: 0,
+          thickness: 0.1,
+          emissive: 0x000000,
+          emissiveIntensity: 0,
+        });
+        const bulbGlass = new THREE.Mesh(bulbGeo, bulbMaterial);
+        bulbGlass.position.y = 3.5;
+
+        // Filamen (Yang menyala)
+        const filGeo = new THREE.TorusGeometry(0.8, 0.05, 16, 100);
+        filGeo.rotateX(Math.PI / 2);
+        // GANTI: Menggunakan MeshStandardMaterial agar properti 'emissive' tersedia
+        const filMat = new THREE.MeshStandardMaterial({
+          color: 0x333333,
+          emissive: 0x000000,
+        });
+        filamentMesh = new THREE.Mesh(filGeo, filMat);
+        filamentMesh.position.y = 3.5;
+
+        // Cahaya Nyata
+        bulbLight = new THREE.PointLight(CONFIG.bulbOnColor, 0, 50);
+        bulbLight.position.y = 4;
+
+        group.add(socket, bulbGlass, filamentMesh, bulbLight);
+
+        group.position.set(0, 0, -10);
+        scene.add(group);
+      }
+
+      function createSwitch() {
+        const group = new THREE.Group();
+
+        const baseGeo = new THREE.BoxGeometry(4, 0.5, 2);
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const base = new THREE.Mesh(baseGeo, baseMat);
+
+        const contactGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.5);
+        const contactMat = new THREE.MeshStandardMaterial({ color: 0xc0c0c0 });
+        const contactA = new THREE.Mesh(contactGeo, contactMat);
+        contactA.position.set(-1.5, 0.5, 0);
+        const contactB = new THREE.Mesh(contactGeo, contactMat);
+        contactB.position.set(1.5, 0.5, 0);
+
+        switchLeverGroup = new THREE.Group();
+        switchLeverGroup.position.set(-1.5, 0.5, 0);
+
+        const leverGeo = new THREE.BoxGeometry(3.5, 0.2, 0.5);
+        const leverMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+        const lever = new THREE.Mesh(leverGeo, leverMat);
+        lever.position.set(1.5, 0, 0);
+
+        const handleGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.5);
+        const handleMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+        const handle = new THREE.Mesh(handleGeo, handleMat);
+        handle.rotation.x = Math.PI / 2;
+        handle.position.set(3, 0, 0);
+
+        switchLeverGroup.add(lever, handle);
+
+        switchLeverGroup.rotation.z = state.isClosed ? 0 : Math.PI / 3;
+
+        group.add(base, contactA, contactB, switchLeverGroup);
+
+        group.position.set(-15, 0, 0);
+        group.rotation.y = Math.PI / 2;
+        scene.add(group);
+      }
+
+      function createParticles() {
+        const geometry = new THREE.SphereGeometry(1.0, 8, 8);
+        const initialColor =
+          state.flowMode === "electron"
+            ? CONFIG.electronColor
+            : CONFIG.conventionalColor;
+        const material = new THREE.MeshBasicMaterial({ color: initialColor });
+
+        particlesMesh = new THREE.InstancedMesh(
+          geometry,
+          material,
+          CONFIG.particleCount
+        );
+        scene.add(particlesMesh);
+
+        for (let i = 0; i < CONFIG.particleCount; i++) {
+          particleProgress.push(i / CONFIG.particleCount);
+          updateParticlePosition(i);
+        }
+      }
+
+      function updateParticlePosition(index) {
+        const pos = circuitPath.getPointAt(particleProgress[index]);
+        dummy.position.copy(pos);
+        dummy.updateMatrix();
+        particlesMesh.setMatrixAt(index, dummy.matrix);
+      }
+
+      // --- LOGIKA SIMULASI ---
+
+      window.toggleSwitch = function () {
+        state.isClosed = !state.isClosed;
+
+        const btn = document.getElementById("btn-switch");
+        const dot = document.getElementById("switch-dot");
+        const eduText = document.getElementById("edu-text");
+
+        if (state.isClosed) {
+          btn.classList.add("active");
+          dot.style.backgroundColor = "#00ff88";
+          dot.style.boxShadow = "0 0 8px #00ff88";
+          updateSimulationState();
+
+          new TWEEN.Tween(switchLeverGroup.rotation)
+            .to({ z: 0 }, 500)
+            .easing(TWEEN.Easing.Elastic.Out)
+            .start();
+
+          updateEduText(true);
+        } else {
+          btn.classList.remove("active");
+          dot.style.backgroundColor = "#ff4444";
+          dot.style.boxShadow = "0 0 8px #ff4444";
+          state.current = 0;
+          // FIX: Update visual saat dimatikan agar lampu mati
+          updateSimulationState();
+
+          new TWEEN.Tween(switchLeverGroup.rotation)
+            .to({ z: Math.PI / 3 }, 500)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .start();
+
+          updateEduText(false);
+        }
+      };
+
+      window.toggleFlowMode = function () {
+        const btn = document.getElementById("btn-flow");
+        const label = document.getElementById("flow-label");
+
+        if (state.flowMode === "conventional") {
+          state.flowMode = "electron";
+          btn.classList.remove("active");
+          btn.style.borderColor = CONFIG.electronColor;
+          btn.style.color = "#00d2ff";
+          label.innerText = "Aliran Elektron (- ke +)";
+          particlesMesh.material.color.setHex(CONFIG.electronColor);
+        } else {
+          state.flowMode = "conventional";
+          btn.classList.add("active");
+          btn.style.borderColor = "";
+          btn.style.color = "";
+          label.innerText = "Arus Konvensional (+ ke -)";
+          particlesMesh.material.color.setHex(CONFIG.conventionalColor);
+        }
+        updateEduText(state.isClosed);
+      };
+
+      function updateSimulationState() {
+        state.voltage = parseFloat(
+          document.getElementById("voltage-slider").value
+        );
+        document.getElementById("voltage-val").innerText =
+          state.voltage.toFixed(1);
+
+        if (state.isClosed) {
+          state.current = state.voltage / state.resistance;
+        } else {
+          state.current = 0;
+        }
+
+        // FIX: Intensitas harus 0 jika saklar terbuka, meskipun baterai punya tegangan
+        const effectiveVoltage = state.isClosed ? state.voltage : 0;
+        const intensityRatio = effectiveVoltage / 12;
+
+        bulbLight.intensity = intensityRatio * 400;
+        bulbLight.color.setHex(
+          state.voltage > 0 ? CONFIG.bulbOnColor : CONFIG.bulbOffColor
+        );
+
+        filamentMesh.material.color.setHex(
+          state.voltage > 1 ? 0xffaa00 : 0x333333
+        );
+        // Sekarang aman karena filamentMesh menggunakan MeshStandardMaterial
+        filamentMesh.material.emissive.setHex(0xff4400);
+        filamentMesh.material.emissiveIntensity = intensityRatio * 50;
+
+        bulbMaterial.color.setHex(0xffffff);
+        bulbMaterial.emissive.setHex(0xffaa00);
+        bulbMaterial.emissiveIntensity = intensityRatio * 20.0;
+
+        state.speedMultiplier = state.current * 0.5;
+      }
+
+      function updateEduText(isClosed) {
+        const eduDiv = document.getElementById("edu-text");
+        if (!isClosed) {
+          eduDiv.innerHTML = `<span class="highlight" style="color:#ff4444">Sirkuit Terbuka.</span> Elektron tidak dapat melompati celah udara pada saklar. Tidak ada arus.`;
+          return;
+        }
+
+        if (state.flowMode === "conventional") {
+          eduDiv.innerHTML = `<span class="highlight" style="color:#ffaa00">Arus Konvensional.</span> Didefinisikan mengalir dari Positif (+) ke Negatif (-). Ini adalah standar historis yang digunakan dalam diagram teknik.`;
+        } else {
+          eduDiv.innerHTML = `<span class="highlight" style="color:#00d2ff">Aliran Elektron.</span> Secara fisik, elektron bermuatan negatif bergerak dari kutub Negatif (-) menuju Positif (+). Kebalikan dari arus konvensional.`;
+        }
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const delta = Math.min(clock.getDelta(), 0.1);
+
+        TWEEN.update();
+
+        if (state.isClosed && state.voltage > 0) {
+          for (let i = 0; i < CONFIG.particleCount; i++) {
+            if (state.flowMode === "conventional") {
+              particleProgress[i] += state.speedMultiplier * delta;
+              if (particleProgress[i] > 1) particleProgress[i] -= 1;
+            } else {
+              particleProgress[i] -= state.speedMultiplier * delta;
+              if (particleProgress[i] < 0) particleProgress[i] += 1;
+            }
+            updateParticlePosition(i);
+          }
+          particlesMesh.instanceMatrix.needsUpdate = true;
+        }
+
+        controls.update();
+        composer.render();
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        composer.setSize(window.innerWidth, window.innerHeight);
+      }
+    </script>
+  </body>
+</html>
